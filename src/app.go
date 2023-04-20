@@ -11,8 +11,8 @@ import (
     "net/url"
     "strconv"
 
-    "github.com/gin-gonic/gin"
     "github.com/PuerkitoBio/goquery"
+    "github.com/gin-gonic/gin"
 )
 
 type SearchResult struct {
@@ -20,54 +20,19 @@ type SearchResult struct {
     Link  string `json:"link"`
 }
 
-func handleSearch(c *gin.Context) {
-    // Get the date input from the request URL
-    date := c.Query("date")
 
-    // Parse the date input into a time.Time object
-    t, err := time.Parse("01-02-2006", date)
-    if err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid date format, use MM-DD-YYYY"})
-        return
-    }
-
-    // Build the search query
-    query := "Florida Man "
-    formattedDate := t.Format("01-31")
-
-    var allResults [] SearchResult
-    keepGoing := true
-    for (keepGoing) {
-        var pageResults []SearchResult
-        done := make(chan bool)
-        stop := make(chan bool)
-        for i := 0; i < 5; i++ {
-            go getResults(query, formattedDate, i * 10, &pageResults, done, stop)
-        }
-
-        
-        for i := 0; i < 5; i++ {
-            select {
-                case <-stop:
-                    keepGoing = false 
-                    fmt.Println("Last batch")
-                case <-done:
-                    continue;
-            }
-        }
-        fmt.Println("Length of results: " + strconv.Itoa(len(pageResults)))
-        if len(pageResults) == 0 {
-            break
-        }
-        allResults = append(allResults, pageResults...)
-    }
-
-    // Return the search results as JSON
-    c.JSON(http.StatusOK, allResults)
-}
-
-func getResults(query string, formattedDate string, start int, results * [] SearchResult, done chan bool, stop chan bool) {
-    path := "https://www.google.com/search?q=" + url.QueryEscape(query) + url.QueryEscape(formattedDate) + ("&start=" + strconv.Itoa(start))
+func search(
+    query string, 
+    formattedDate string, 
+    start int, 
+    results * [] SearchResult, 
+    done chan bool, 
+    stop chan bool,
+) {
+    path := "https://www.google.com/search?q=" + 
+        url.QueryEscape(query) + 
+        url.QueryEscape(formattedDate) + 
+        ("&start=" + strconv.Itoa(start))
 
     // Create a HTTP client with custom User-Agent header
     client := &http.Client{}
@@ -126,6 +91,59 @@ func getResults(query string, formattedDate string, start int, results * [] Sear
     }  
     
     done <- true
+}
+
+func handleSearch(c *gin.Context) {
+    // Get the date input from the request URL
+    date := c.Query("date")
+
+    // Parse the date input into a time.Time object
+    t, err := time.Parse("01-02-2006", date)
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid date format, use MM-DD-YYYY"})
+        return
+    }
+
+    // Build the search query
+    query := "Florida Man "
+    formattedDate := t.Format("01-31")
+
+    var allResults [] SearchResult
+    keepGoing := true
+    for (keepGoing) {
+        var pageResults []SearchResult
+        done := make(chan bool)
+        stop := make(chan bool)
+        for i := 0; i < 5; i++ {
+            go search(
+                query, 
+                formattedDate, 
+                i * 10, 
+                &pageResults, 
+                done, 
+                stop,
+            )
+        }
+
+        
+        for i := 0; i < 5; i++ {
+            select {
+                case <-stop:
+                    keepGoing = false 
+                    fmt.Println("Last batch")
+                case <-done:
+                    continue;
+            }
+        }
+
+        if len(pageResults) == 0 {
+            break
+        }
+        allResults = append(allResults, pageResults...)
+    }
+
+    // Return the search results as JSON
+    c.JSON(http.StatusOK, allResults)
 }
 
 func main() {
