@@ -79,7 +79,42 @@ func search(
 
         if exists && strings.Contains(strings.ToLower(title), "florida man") && strings.Contains(link, "https") {
             if (!seenTitles[title]) {
-                * results = append(* results, SearchResult { Title: title, Link: link[8:] })
+
+                follower := &http.Client{} 
+                req, err := http.NewRequest("GET", link, nil)
+                if err != nil {
+                   log.Fatal("Failed to scrape search results: ", err)
+                }
+                req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36")
+                resp, err := follower.Do(req)
+                if err != nil {
+                   log.Fatal("Failed to scrape search results: ", err)
+                }
+
+                defer resp.Body.Close() // Tells go to execute after the parent function returns
+
+                body, err := ioutil.ReadAll(resp.Body)
+                if err != nil {
+                   log.Fatal("Failed to read search results: ", err)
+                }
+
+                // Scrape the search results
+                linkedDoc, err := goquery.NewDocumentFromReader(bytes.NewReader(body))
+                if err != nil {
+                   log.Fatal("Failed to scrape search results: ", err)
+                }
+                
+
+                var h1s []string
+                linkedDoc.Find("h1").Each(func (j int, selector * goquery.Selection) {
+                    h1s = append(h1s, selector.Text())
+                })
+                var foundTitle string
+                if len(h1s) > 0 {
+                    foundTitle = h1s[0]
+                }
+
+                * results = append(* results, SearchResult { Title: foundTitle, Link: link[8:] })
                 seenTitles[title] = true
                 count += 1
             }
@@ -109,36 +144,22 @@ func handleSearch(c *gin.Context) {
     formattedDate := t.Format("01-31")
 
     var allResults [] SearchResult
-    keepGoing := true
-    for (keepGoing) {
-        var pageResults []SearchResult
-        done := make(chan bool)
-        stop := make(chan bool)
-        for i := 0; i < 5; i++ {
-            go search(
-                query, 
-                formattedDate, 
-                i * 10, 
-                &pageResults, 
-                done, 
-                stop,
-            )
-        }
+    var pageResults []SearchResult
+    done := make(chan bool)
+    stop := make(chan bool)
+    for i := 0; i < 1; i++ {
+        go search(
+            query, 
+            formattedDate, 
+            i * 10, 
+            &pageResults, 
+            done, 
+            stop,
+        )
+    }
 
-        
-        for i := 0; i < 5; i++ {
-            select {
-                case <-stop:
-                    keepGoing = false 
-                    fmt.Println("Last batch")
-                case <-done:
-                    continue;
-            }
-        }
-
-        if len(pageResults) == 0 {
-            break
-        }
+    
+    if <-done == true {
         allResults = append(allResults, pageResults...)
     }
 
