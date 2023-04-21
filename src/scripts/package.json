@@ -1,0 +1,16 @@
+{
+  "name": "florida-man-api",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/griffinpj/florida-man-api)",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo Error: no test specified && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "date-fns": "^2.29.3",
+    "node-fetch": "^3.3.1"
+  }
+}
